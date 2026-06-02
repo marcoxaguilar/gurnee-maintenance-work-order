@@ -1,0 +1,16 @@
+{
+  "name": "Gurnee Maintenance",
+  "short_name": "Gurnee Maint.",
+  "description": "Work orders for Gurnee Maintenance",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F2E9",
+  "theme_color": "#557049",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
