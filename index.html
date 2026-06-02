@@ -1113,11 +1113,12 @@ function openEditor(id){
 
       ${customerField}
 
-      <div class="field"><label>Contact name <span style="color:var(--faint);font-weight:600">(person at the customer for this job)</span></label>
-        <input id="eContact" value="${esc(editorState.contact||"")}" placeholder="e.g. Karen Mills"></div>
-
-      <div class="field"><label>Contact phone <span style="color:var(--faint);font-weight:600">(best number to reach them)</span></label>
-        <input id="eContactPhone" type="tel" value="${esc(editorState.contactPhone||"")}" placeholder="e.g. (224) 555-0142"></div>
+      <div class="row2">
+        <div class="field"><label>Contact name <span style="color:var(--faint);font-weight:600">(person for this job)</span></label>
+          <input id="eContact" value="${esc(editorState.contact||"")}" placeholder="e.g. Karen Mills"></div>
+        <div class="field"><label>Contact phone <span style="color:var(--faint);font-weight:600">(best number)</span></label>
+          <input id="eContactPhone" type="tel" value="${esc(editorState.contactPhone||"")}" placeholder="e.g. (224) 555-0142"></div>
+      </div>
 
       <div class="field"><label>Location / address</label>
         <input id="eAddress" value="${esc(editorState.address||"")}" placeholder="Start typing the address…">
