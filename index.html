@@ -132,10 +132,12 @@ a{color:inherit}
 
 /* ---------- CALENDAR ---------- */
 .cal-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
-.cal-bar h3{font-family:var(--serif);font-size:22px;font-weight:600;min-width:220px;color:var(--brand-deep)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px}
+.cal-bar h3{font-family:var(--serif);font-size:22px;font-weight:600;min-width:200px;color:var(--brand-deep)}
+.cal-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;width:100%}
 .cal-dow{text-align:center;font-size:12.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 0}
-.cal-cell{background:var(--panel);border:1px solid var(--line);border-radius:12px;min-height:116px;padding:8px;display:flex;flex-direction:column;gap:5px;transition:border-color .15s}
+/* cells flex to fill width; height scales with the viewport so big screens use the space */
+.cal-cell{background:var(--panel);border:1px solid var(--line);border-radius:12px;min-height:clamp(96px,13vw,150px);padding:8px;display:flex;flex-direction:column;gap:5px;transition:border-color .15s;overflow:hidden}
 .cal-cell.other{opacity:.45}
 .cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
 .cal-cell .daynum{font-size:13px;font-weight:800;color:var(--muted)}
@@ -143,6 +145,21 @@ a{color:inherit}
 .cal-evt{font-size:12px;font-weight:700;padding:4px 8px;border-radius:7px;color:#fff;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cal-evt:hover{filter:brightness(1.1)}
 .cal-more{font-size:11.5px;color:var(--faint);font-weight:800;padding-left:3px}
+/* tablet */
+@media(max-width:820px){
+  .cal-dow{font-size:11px}
+  .cal-cell{padding:6px;border-radius:10px}
+  .cal-evt{font-size:11px;padding:3px 6px}
+}
+/* phone: keep 7 columns readable by allowing a horizontal scroll with a sane min width */
+@media(max-width:560px){
+  .cal-grid{grid-template-columns:repeat(7,minmax(46px,1fr));min-width:360px}
+  .cal-cell{min-height:74px;gap:3px}
+  .cal-dow{font-size:10px;letter-spacing:.3px}
+  .cal-cell .daynum{font-size:11px}
+  .cal-evt{font-size:9.5px;padding:2px 5px;border-radius:5px}
+  .cal-bar h3{font-size:19px;min-width:0}
+}
 .legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin-top:20px;padding:16px 18px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius)}
 .legend .li{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--muted);font-weight:700}
 .legend .sw{width:15px;height:15px;border-radius:5px}
@@ -296,17 +313,17 @@ tr.low td{background:var(--urgent-soft)}
       <button id="rCust" class="on" onclick="setAuthRole('customer')">I'm a Customer</button>
       <button id="rStaff" onclick="setAuthRole('staff')">Gurnee Staff</button>
     </div>
-    <div id="staffRole" class="seg hidden" style="margin-top:-8px">
-      <button id="rAdmin" class="on" onclick="setStaffRole('admin')">Admin / Office</button>
-      <button id="rTech" onclick="setStaffRole('technician')">Technician</button>
+    <div id="staffHint" class="hidden" style="background:var(--brand-soft);border:1px solid #CADBBE;border-radius:11px;padding:11px 14px;font-size:13.5px;color:#3c5a36;margin-bottom:16px;line-height:1.5">
+      <b>Fred:</b> just type your name <b>Fred</b> and tap Log In — no password needed.<br>
+      <b>Kim &amp; Marco:</b> use your email and password.
     </div>
     <div id="authErr" class="auth-err hidden"></div>
     <div id="signupName" class="field hidden">
       <label id="nameLbl">Your name</label>
       <input type="text" id="suName" placeholder="e.g. Margaret Ellison">
     </div>
-    <div class="field"><label>Email</label><input type="email" id="authEmail" placeholder="you@email.com" autocomplete="email"></div>
-    <div class="field"><label>Password</label><input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="field"><label id="emailLbl">Email</label><input type="text" id="authEmail" placeholder="you@email.com" autocomplete="email"></div>
+    <div class="field" id="passField"><label>Password</label><input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn btn-primary" id="authBtn" onclick="doAuth()">Log In</button>
     <p class="auth-switch"><span id="switchTxt">New here?</span> <a id="switchLink" onclick="toggleMode()">Create an account</a></p>
     <p class="fb-warn" id="fbWarn"></p>
@@ -413,7 +430,9 @@ const DEFAULT_TAX = 8.0; // % — Gurnee/Lake County-ish default; editable per i
 let fb=null,db=null,auth=null,FB_OK=false;
 let me=null, orders=[], techs=[], inventory=[], customers=[];
 let unsubO=null,unsubT=null,unsubI=null,unsubC=null;
-let currentView="queue", authMode="login", authRole="customer", staffRole="admin";
+let currentView="queue", authMode="login", authRole="customer";
+// Fred — the one technician who signs in with just his name (no password).
+const FRED_NAME="Fred", FRED_EMAIL="fred@gurnee.com", FRED_PASSWORD="gurnee-fred-login";
 let editorState=null, invoiceState=null, calRef=new Date();
 
 /* ---------- GOOGLE PLACES ---------- */
@@ -515,13 +534,10 @@ function initDemo(){
 function setAuthRole(r){ authRole=r;
   document.getElementById("rCust").classList.toggle("on",r==="customer");
   document.getElementById("rStaff").classList.toggle("on",r==="staff");
-  document.getElementById("staffRole").classList.toggle("hidden",r!=="staff");
+  document.getElementById("staffHint").classList.toggle("hidden",r!=="staff");
+  // Staff: relabel email field so Fred knows he can just type his name.
+  document.getElementById("emailLbl").textContent = r==="staff" ? "Email — or type “Fred”" : "Email";
 }
-function setStaffRole(r){ staffRole=r;
-  document.getElementById("rAdmin").classList.toggle("on",r==="admin");
-  document.getElementById("rTech").classList.toggle("on",r==="technician");
-}
-function effectiveRole(){ return authRole==="customer"?"customer":staffRole; }
 function toggleMode(){
   authMode=authMode==="login"?"signup":"login";
   const su=authMode==="signup";
@@ -534,14 +550,37 @@ function toggleMode(){
 function authError(m){ const e=document.getElementById("authErr"); e.textContent=m; e.classList.remove("hidden"); }
 function showAuth(){ document.getElementById("auth").classList.remove("hidden"); document.getElementById("app").classList.add("hidden"); document.getElementById("fab").classList.add("hidden"); }
 
+// Fred signs in with just his name. Behind the scenes we use fixed credentials so he's a real,
+// secure Firestore user — but he never types a password.
+async function fredLogin(){
+  if(!FB_OK){
+    me={uid:"demo-fred",email:FRED_EMAIL,name:"Fred",role:"technician"};
+    localStorage.setItem("gm_session",JSON.stringify(me)); enterApp(); return;
+  }
+  try{ await auth.signInWithEmailAndPassword(FRED_EMAIL,FRED_PASSWORD); }
+  catch(e){
+    const c=e.code||e.message||"";
+    if(c.includes("user-not-found")||c.includes("invalid-credential")){
+      // First time Fred logs in — provision his account automatically.
+      try{
+        const cred=await auth.createUserWithEmailAndPassword(FRED_EMAIL,FRED_PASSWORD);
+        await db.collection("users").doc(cred.user.uid).set({name:"Fred",email:FRED_EMAIL,role:"technician",ts:Date.now()});
+      }catch(e2){ authError("Couldn't sign Fred in: "+(e2.code||e2.message||"")); }
+    }else{ authError("Couldn't sign Fred in: "+c); }
+  }
+}
+
 async function doAuth(){
-  const email=document.getElementById("authEmail").value.trim();
+  const idVal=document.getElementById("authEmail").value.trim();
   const pass=document.getElementById("authPass").value;
   const name=document.getElementById("suName").value.trim();
-  let role=effectiveRole();
-  // Lock admin to the two approved emails. Any other "staff" signup is a technician.
-  if(role==="admin" && !isAdminEmail(email)) role="technician";
-  if(role!=="customer" && isAdminEmail(email)) role="admin";
+
+  // Fred: name-only login (staff side).
+  if(authRole==="staff" && idVal.toLowerCase()===FRED_NAME.toLowerCase()){ return fredLogin(); }
+
+  const email=idVal;
+  // Role is decided by the email: the two approved emails are admins, all other staff are technicians.
+  let role = authRole==="customer" ? "customer" : (isAdminEmail(email) ? "admin" : "technician");
   if(!email||!pass) return authError("Please enter your email and password.");
   if(authMode==="signup"&&!name) return authError("Please enter your name.");
   if(!FB_OK){
@@ -568,12 +607,13 @@ async function loadProfile(u){
   let d=await db.collection("users").doc(u.uid).get();
   if(!d.exists){ await db.collection("users").doc(u.uid).set({name:u.email.split("@")[0],email:u.email,role:"customer",ts:Date.now()}); d=await db.collection("users").doc(u.uid).get(); }
   const x=d.data();
-  let role=x.role;
+  let role=x.role, name=x.name;
   // Enforce the admin allowlist no matter what the stored doc says.
   if(isAdminEmail(u.email)) role="admin";
+  else if((u.email||"").toLowerCase()===FRED_EMAIL){ role="technician"; name="Fred"; }
   else if(role==="admin") role="technician"; // someone wrongly stored as admin gets demoted
-  if(role!==x.role){ try{ await db.collection("users").doc(u.uid).set({role},{merge:true}); }catch(_){ } }
-  me={uid:u.uid,email:u.email,name:x.name,role,businessName:x.businessName||"",businessId:x.businessId||""};
+  if(role!==x.role || name!==x.name){ try{ await db.collection("users").doc(u.uid).set({role,name},{merge:true}); }catch(_){ } }
+  me={uid:u.uid,email:u.email,name,role,businessName:x.businessName||"",businessId:x.businessId||""};
 }
 function logout(){
   [unsubO,unsubT,unsubI,unsubC].forEach(f=>f&&f()); unsubO=unsubT=unsubI=unsubC=null;
@@ -837,6 +877,7 @@ function renderCalendar(m){
   wrap.innerHTML=`<div class="view-title"><h2>Schedule</h2></div>
     <div class="cal-bar"><button class="icon-btn" onclick="calNav(-1)">‹ Prev</button><h3>${month}</h3>
       <button class="icon-btn" onclick="calNav(1)">Next ›</button><button class="icon-btn" onclick="calToday()">Today</button></div>`;
+  const scroll=document.createElement("div"); scroll.className="cal-scroll";
   const grid=document.createElement("div"); grid.className="cal-grid";
   ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(d=>{const h=document.createElement("div");h.className="cal-dow";h.textContent=d;grid.appendChild(h);});
   const y=calRef.getFullYear(),mo=calRef.getMonth(),startDow=new Date(y,mo,1).getDay();
@@ -850,9 +891,14 @@ function renderCalendar(m){
     if(day.length>3){const more=document.createElement("div");more.className="cal-more";more.textContent=`+${day.length-3} more`;cell.appendChild(more);}
     grid.appendChild(cell);
   }
-  wrap.appendChild(grid);
+  scroll.appendChild(grid); wrap.appendChild(scroll);
   const leg=document.createElement("div"); leg.className="legend";
-  CUSTOMER_COLORS.forEach(c=>{const li=document.createElement("div");li.className="li";li.innerHTML=`<span class="sw" style="background:${c.color}"></span>${c.label}`;leg.appendChild(li);});
+  // Legend reflects the businesses you actually have (with their chosen colors).
+  const seen=new Set();
+  customers.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(c=>{
+    if(seen.has(c.name.toLowerCase()))return; seen.add(c.name.toLowerCase());
+    const li=document.createElement("div");li.className="li";li.innerHTML=`<span class="sw" style="background:${c.color||DEFAULT_COLOR}"></span>${esc(c.name)}`;leg.appendChild(li);
+  });
   const li=document.createElement("div");li.className="li";li.innerHTML=`<span class="sw" style="background:${DEFAULT_COLOR}"></span>Other / one-off`;leg.appendChild(li);
   wrap.appendChild(leg); m.appendChild(wrap);
 }
